@@ -1,0 +1,55 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+}
+
+// Set by the release workflow; local builds use the fallback.
+group = 'com.krakenplugins'
+version = System.getenv("VERSION") ?: '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    withSourcesJar()
+}
+
+// Compiled for Java 11 so the plugin loads in builds whose Gradle daemon still runs on 11. The client it launches
+// always runs on RuneLite's bundled JRE or a Java 17 toolchain.
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release.set(11)
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+gradlePlugin {
+    plugins {
+        kraken {
+            id = 'com.krakenplugins.plugin'
+            implementationClass = 'com.krakenplugins.gradle.KrakenPlugin'
+            displayName = 'Kraken plugin development'
+            description = 'Runs the Kraken client with the plugin being developed sideloaded, and checks Kraken API versions.'
+        }
+    }
+}
+
+publishing {
+    repositories {
+        // A Maven repository layout on disk, uploaded to the public kraken-bootstrap-static/maven/ prefix in SeaweedFS
+        // and served as https://repo.kraken-plugins.com, the same way as the Kraken API.
+        maven {
+            name = "Staging"
+            url = layout.buildDirectory.dir("maven-repo")
+        }
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
