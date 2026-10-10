@@ -73,5 +73,9 @@ manifest, which `kraken-api` copies from the `runeliteVersion` and `revision` fi
 ./gradlew build      # compile, validate the plugin and run unit + TestKit tests
 ```
 
-The release workflow publishes with `./gradlew publishAllPublicationsToStagingRepository` and uploads
-`build/maven-repo` to `kraken-bootstrap-static/maven/`, like the Kraken API.
+Every push to `master` releases the plugin through `.github/workflows/release.yml`, the same way as the Kraken API.
+The first release of a `version.txt` version uses it as-is; later pushes release the next patch of that major.minor
+(0.1.1, 0.1.2, ...). The workflow publishes with `./gradlew publishAllPublicationsToStagingRepository`, uploads
+`build/maven-repo` to `kraken-bootstrap-static/maven/` (served as https://repo.kraken-plugins.com), then tags the
+version and creates a GitHub release. It needs the `SEAWEED_ACCESS_KEY`, `SEAWEED_SECRET_KEY` and `SEAWEED_URL`
+secrets (`SEAWEED_URL` includes the scheme, e.g. `https://seaweed.kraken-plugins.com`).

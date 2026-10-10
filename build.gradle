@@ -3,9 +3,9 @@ plugins {
     id 'maven-publish'
 }
 
-// Set by the release workflow; local builds use the fallback.
+// Set by the release workflow, which bumps the patch once version.txt's version is released; local builds use version.txt.
 group = 'com.krakenplugins'
-version = System.getenv("VERSION") ?: '0.1.0'
+version = System.getenv("VERSION") ?: file('version.txt').text.trim()
 
 repositories {
     mavenCentral()
@@ -41,8 +41,6 @@ gradlePlugin {
 
 publishing {
     repositories {
-        // A Maven repository layout on disk, uploaded to the public kraken-bootstrap-static/maven/ prefix in SeaweedFS
-        // and served as https://repo.kraken-plugins.com, the same way as the Kraken API.
         maven {
             name = "Staging"
             url = layout.buildDirectory.dir("maven-repo")
