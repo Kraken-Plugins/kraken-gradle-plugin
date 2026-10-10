@@ -8,8 +8,10 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.result.ResolvedArtifactResult;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.provider.Provider;
+import org.gradle.api.tasks.TaskProvider;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,7 +47,7 @@ public class KrakenPlugin implements Plugin<Project> {
                 .flatMap(configuration -> configuration.getIncoming().getArtifacts().getResolvedArtifacts())
                 .map(KrakenPlugin::describe);
 
-        project.getTasks().register(RUN_TASK_NAME, RunKrakenTask.class, task -> {
+        TaskProvider<RunKrakenTask> runKraken = project.getTasks().register(RUN_TASK_NAME, RunKrakenTask.class, task -> {
             task.setGroup(TASK_GROUP);
             task.setDescription("Launches the Kraken client with this plugin sideloaded.");
             task.getRuneliteDirectory().convention(extension.getRuneliteDirectory());
@@ -56,12 +58,36 @@ public class KrakenPlugin implements Plugin<Project> {
             task.getCompileLibraries().convention(compileLibraries);
             task.getDebugJvm().convention(false);
         });
+        skipWhenAnAncestorLaunches(project, runKraken);
 
         project.getTasks().register(VERSIONS_TASK_NAME, KrakenVersionsTask.class, task -> {
             task.setGroup(TASK_GROUP);
             task.setDescription("Compares the Kraken API this project compiles against with the one the Kraken client runs.");
             task.getKrakenDirectory().convention(extension.getKrakenDirectory());
             task.getCompileLibraries().convention(compileLibraries);
+        });
+    }
+
+    /**
+     * Running {@code runKraken} from a parent project also selects the {@code runKraken} of every subproject, which
+     * would launch the client once per project, one after another. The parent's launch is the one that runs; it's the
+     * one asked for, and a multi-plugin build typically sideloads its subprojects' jars there.
+     */
+    private static void skipWhenAnAncestorLaunches(Project project, TaskProvider<RunKrakenTask> runKraken) {
+        String ownPath = project.absoluteProjectPath(RUN_TASK_NAME);
+        List<String> ancestorPaths = new ArrayList<>();
+        for (Project ancestor = project.getParent(); ancestor != null; ancestor = ancestor.getParent()) {
+            ancestorPaths.add(ancestor.absoluteProjectPath(RUN_TASK_NAME));
+        }
+        if (ancestorPaths.isEmpty()) {
+            return;
+        }
+        project.getGradle().getTaskGraph().whenReady(graph -> {
+            if (!graph.hasTask(ownPath)) {
+                return;
+            }
+            ancestorPaths.stream().filter(graph::hasTask).findFirst()
+                    .ifPresent(ancestorPath -> runKraken.configure(task -> task.getLaunchedBy().set(ancestorPath)));
         });
     }
 

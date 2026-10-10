@@ -10,7 +10,11 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -60,11 +64,57 @@ class KrakenPluginFunctionalTest {
         assertTrue(result.getOutput().contains("Install the Kraken launcher"), result.getOutput());
     }
 
-    private GradleRunner runner(String task) {
+    @Test
+    void runKrakenFromTheRootLaunchesTheClientOnce() throws IOException {
+        write("settings.gradle", "rootProject.name = 'my-plugins'\ninclude 'mining', 'fishing'\n");
+        write("build.gradle", String.join("\n",
+                "plugins { id 'com.krakenplugins.plugin' }",
+                "allprojects {",
+                "    apply plugin: 'com.krakenplugins.plugin'",
+                "    kraken {",
+                "        krakenDirectory = rootProject.file('kraken-home')",
+                "        runeliteDirectory = rootProject.file('no-runelite-here')",
+                "    }",
+                "}",
+                "kraken { sideload.setFrom(subprojects.collect { it.tasks.named('jar') }) }",
+                ""));
+
+        for (int run = 0; run < 2; run++) {
+            String output = runner("runKraken", "--continue").buildAndFail().getOutput();
+
+            assertTrue(output.contains("Task :mining:jar") && output.contains("Task :fishing:jar"), output);
+            assertEquals(2, output.split("Skipping: :runKraken launches the client.", -1).length - 1, output);
+            assertTrue(output.contains("Task :runKraken FAILED"), output);
+            assertFalse(output.contains("Task :mining:runKraken FAILED") || output.contains("Task :fishing:runKraken FAILED"), output);
+        }
+    }
+
+    @Test
+    void runKrakenInASubprojectStillLaunches() throws IOException {
+        write("settings.gradle", "rootProject.name = 'my-plugins'\ninclude 'mining'\n");
+        write("build.gradle", String.join("\n",
+                "plugins { id 'com.krakenplugins.plugin' }",
+                "allprojects {",
+                "    apply plugin: 'com.krakenplugins.plugin'",
+                "    kraken {",
+                "        krakenDirectory = rootProject.file('kraken-home')",
+                "        runeliteDirectory = rootProject.file('no-runelite-here')",
+                "    }",
+                "}",
+                ""));
+
+        String output = runner(":mining:runKraken").buildAndFail().getOutput();
+
+        assertTrue(output.contains("RuneLite.jar was not found in"), output);
+    }
+
+    private GradleRunner runner(String... tasks) {
+        List<String> arguments = new ArrayList<>(List.of(tasks));
+        arguments.addAll(List.of("--configuration-cache", "--stacktrace"));
         return GradleRunner.create()
                 .withProjectDir(projectDirectory)
                 .withPluginClasspath()
-                .withArguments(task, "--configuration-cache", "--stacktrace");
+                .withArguments(arguments);
     }
 
     private void write(String path, String content) throws IOException {

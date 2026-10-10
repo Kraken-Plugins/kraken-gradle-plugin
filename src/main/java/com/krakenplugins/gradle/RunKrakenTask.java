@@ -75,6 +75,13 @@ public abstract class RunKrakenTask extends DefaultTask {
     @Option(option = "debug-jvm", description = "Waits for a debugger to attach on port 5005 before starting the client.")
     public abstract Property<Boolean> getDebugJvm();
 
+    /**
+     * @return the path of the parent project's {@code runKraken} that launches the client instead of this task, when
+     * both run in the same build
+     */
+    @Internal
+    public abstract Property<String> getLaunchedBy();
+
     @Inject
     protected abstract ExecOperations getExecOperations();
 
@@ -83,6 +90,10 @@ public abstract class RunKrakenTask extends DefaultTask {
 
     @TaskAction
     public void run() {
+        if (getLaunchedBy().isPresent()) {
+            getLogger().lifecycle("Skipping: " + getLaunchedBy().get() + " launches the client.");
+            return;
+        }
         File runeliteDirectory = requireInstallation();
 
         VersionReport report = VersionReport.create(getCompileLibraries().get(), getKrakenDirectory().get().getAsFile());
