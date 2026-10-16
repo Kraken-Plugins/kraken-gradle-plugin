@@ -27,6 +27,28 @@ public final class KrakenBootstrap {
      * there is no saved bootstrap or it lists no Kraken API
      */
     public static ApiTarget runtimeApi(File krakenDirectory) {
+        File jar = listedApiJar(krakenDirectory);
+        if (jar == null) {
+            return null;
+        }
+        if (jar.isFile()) {
+            return ApiTarget.fromJar(jar);
+        }
+        return new ApiTarget(ApiTarget.versionFromFileName(jar.getName()), null, null);
+    }
+
+    /**
+     * Finds the cached Kraken API jar the saved bootstrap lists.
+     *
+     * @param krakenDirectory Kraken's data directory, normally {@code ~/.runelite/kraken}
+     * @return the jar, or {@code null} when there is no saved bootstrap, it lists no Kraken API, or the jar isn't cached
+     */
+    public static File runtimeApiJar(File krakenDirectory) {
+        File jar = listedApiJar(krakenDirectory);
+        return jar != null && jar.isFile() ? jar : null;
+    }
+
+    private static File listedApiJar(File krakenDirectory) {
         File repository = new File(krakenDirectory, REPOSITORY_DIRECTORY);
         File bootstrap = new File(repository, BOOTSTRAP_FILE);
         if (!bootstrap.isFile()) {
@@ -40,14 +62,6 @@ public final class KrakenBootstrap {
             return null;
         }
         Matcher matcher = API_ARTIFACT.matcher(json);
-        if (!matcher.find()) {
-            return null;
-        }
-
-        File jar = new File(repository, matcher.group(1));
-        if (jar.isFile()) {
-            return ApiTarget.fromJar(jar);
-        }
-        return new ApiTarget(ApiTarget.versionFromFileName(jar.getName()), null, null);
+        return matcher.find() ? new File(repository, matcher.group(1)) : null;
     }
 }
