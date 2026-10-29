@@ -50,6 +50,9 @@ With `apiVersion` and `runeliteVersion` set, the plugin adds the Kraken, RuneLit
 limited to the groups it serves, and declares both dependencies `compileOnly` (the client provides them at runtime) and
 `testImplementation`. Without them, declare the dependencies yourself as before.
 
+The plugin also writes the project `version` into the jar manifest as `Implementation-Version`, which the Kraken client
+shows as the plugin's version. A build that sets `Implementation-Version` itself keeps its own value.
+
 ## Tasks
 
 | Task | What it does |
