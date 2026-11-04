@@ -10,11 +10,14 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.jar.JarFile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -108,6 +111,37 @@ class KrakenPluginFunctionalTest {
         assertTrue(output.contains("RuneLite.jar was not found in"), output);
     }
 
+    @Test
+    void jarManifestCarriesTheProjectVersion() throws IOException {
+        append("build.gradle", "version = '1.4.2'\n");
+
+        runner("jar").build();
+
+        assertEquals("1.4.2", implementationVersion(new File(projectDirectory, "build/libs/my-plugin-1.4.2.jar")));
+    }
+
+    @Test
+    void jarManifestKeepsTheImplementationVersionTheBuildSets() throws IOException {
+        append("build.gradle", "version = '1.4.2'\njar { manifest { attributes('Implementation-Version': '1.4.2-custom') } }\n");
+
+        runner("jar").build();
+
+        assertEquals("1.4.2-custom", implementationVersion(new File(projectDirectory, "build/libs/my-plugin-1.4.2.jar")));
+    }
+
+    @Test
+    void jarManifestHasNoImplementationVersionWithoutAProjectVersion() throws IOException {
+        runner("jar").build();
+
+        assertNull(implementationVersion(new File(projectDirectory, "build/libs/my-plugin.jar")));
+    }
+
+    private static String implementationVersion(File jar) throws IOException {
+        try (JarFile file = new JarFile(jar)) {
+            return file.getManifest().getMainAttributes().getValue("Implementation-Version");
+        }
+    }
+
     private GradleRunner runner(String... tasks) {
         List<String> arguments = new ArrayList<>(List.of(tasks));
         arguments.addAll(List.of("--configuration-cache", "--stacktrace"));
@@ -121,5 +155,9 @@ class KrakenPluginFunctionalTest {
         File file = new File(projectDirectory, path);
         Files.createDirectories(file.getParentFile().toPath());
         Files.writeString(file.toPath(), content);
+    }
+
+    private void append(String path, String content) throws IOException {
+        Files.writeString(new File(projectDirectory, path).toPath(), content, StandardOpenOption.APPEND);
     }
 }

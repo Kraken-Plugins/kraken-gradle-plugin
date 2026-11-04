@@ -52,6 +52,7 @@ public class KrakenPlugin implements Plugin<Project> {
     static final String RUNELITE_REPOSITORY = "https://repo.runelite.net";
     static final String KRAKEN_API_GROUP = "com.github.kraken";
     private static final String TASK_GROUP = "kraken";
+    private static final String IMPLEMENTATION_VERSION = "Implementation-Version";
 
     @Override
     public void apply(Project project) {
@@ -99,6 +100,7 @@ public class KrakenPlugin implements Plugin<Project> {
             if (extension.getAddRepositories().get()) {
                 addRepositories(project.getRepositories());
             }
+            addImplementationVersion(project);
         });
 
         File apiCache = new File(project.getGradle().getGradleUserHomeDir(), "caches/kraken-plugin/api");
@@ -152,6 +154,20 @@ public class KrakenPlugin implements Plugin<Project> {
     private static void addLater(Project project, String configuration, Provider<List<Dependency>> dependencies) {
         project.getConfigurations().named(configuration, c ->
                 c.getDependencies().addAllLater(dependencies.orElse(Collections.emptyList())));
+    }
+
+    /**
+     * Writes the project version into the jar manifest as {@code Implementation-Version}, which the Kraken client shows
+     * as the plugin's version. An {@code Implementation-Version} the build sets itself is kept, and nothing is written
+     * when the project has no version. Runs after the build script, so it sees the version the script sets.
+     */
+    private static void addImplementationVersion(Project project) {
+        String version = String.valueOf(project.getVersion());
+        if (Project.DEFAULT_VERSION.equals(version)) {
+            return;
+        }
+        project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, jar ->
+                jar.getManifest().getAttributes().putIfAbsent(IMPLEMENTATION_VERSION, version));
     }
 
     /**
